@@ -3,7 +3,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import {
   deleteDataset,
   deleteReport,
@@ -271,67 +271,113 @@ async function startServer() {
   });
 
   app.post('/api/ai/research', async (req, res) => {
-    const { question, earthSiteId, targetSiteId } = req.body as {
+    const { question, earthSiteId, targetSiteId, history } = req.body as {
       question?: string;
       earthSiteId?: string;
       targetSiteId?: string;
+      history?: Array<{
+        question?: string;
+        retrievedFacts?: string[];
+        scientificInterpretation?: string;
+      }>;
     };
-    if (!question?.trim()) {
+    const trimmedQuestion = question?.trim() ?? '';
+    if (!trimmedQuestion) {
       res.status(400).json({ error: 'A research question is required.' });
       return;
     }
 
     const sites = getAllSites();
     const datasets = getAllDatasets();
-    const focusEarth = sites.find((s) => s.id === earthSiteId);
-    const focusTarget = sites.find((s) => s.id === targetSiteId);
+    const focusEarth = earthSiteId ? sites.find((s) => s.id === earthSiteId) ?? null : null;
+    const focusTarget = targetSiteId ? sites.find((s) => s.id === targetSiteId) ?? null : null;
+
+    const focusComparison =
+      focusEarth && focusTarget ? evaluateSimilarity(focusEarth, focusTarget, DEFAULT_WEIGHTS) : null;
+
+    const serializeSite = (s: AnalogSite) => ({
+      id: s.id,
+      name: s.name,
+      region: s.region,
+      countryOrSector: s.countryOrSector,
+      body: s.body,
+      category: s.category,
+      status: s.status,
+      provenance: s.provenance,
+      dataCompletenessPct: s.dataCompletenessPct,
+      elevationMinM: s.elevationMinM,
+      elevationMaxM: s.elevationMaxM,
+      elevationMeanM: s.elevationMeanM,
+      reliefM: s.reliefM,
+      meanSlopeDeg: s.meanSlopeDeg,
+      maxSlopeDeg: s.maxSlopeDeg,
+      triMeanM: s.triMeanM,
+      tempMinC: s.tempMinC,
+      tempMaxC: s.tempMaxC,
+      waterIceIndicator: s.waterIceIndicator,
+      waterIceScore: s.waterIceScore,
+      mineralogyClass: s.mineralogyClass,
+      surfaceMaterial: s.surfaceMaterial,
+      geologySummary: s.geologySummary,
+      resourceIndicators: s.resourceIndicators,
+      recommendedTargetId: s.recommendedTargetId,
+      limitations: s.limitations,
+    });
+
+    const processedDatasets = datasets.filter((d) => d.processingStatus === 'Processed');
+    const pendingDatasets = datasets.filter(
+      (d) => d.processingStatus === 'Pending Upload (Not Mounted)'
+    );
 
     const dbContext = {
-      processedDatasets: datasets
-        .filter((d) => d.processingStatus === 'Processed')
-        .map((d) => ({
-          filename: d.filename,
-          format: d.format,
-          planet: d.planet,
-          region: d.region,
-          crs: d.crs,
-          resolution: d.resolution,
-          qualityScore: d.qualityScore,
-          elevationMinM: d.summaryStats?.elevationMinM ?? null,
-          elevationMaxM: d.summaryStats?.elevationMaxM ?? null,
-          meanSlopeDeg: d.summaryStats?.meanSlopeDeg ?? null,
-          triMeanM: d.summaryStats?.triMeanM ?? null,
-        })),
-      pendingUnmountedDatasets: datasets
-        .filter((d) => d.processingStatus === 'Pending Upload (Not Mounted)')
-        .map((d) => d.filename),
-      focusEarthSite: focusEarth ?? null,
-      focusPlanetaryTarget: focusTarget ?? null,
-      availableEarthSites: sites
-        .filter((s) => s.body === 'Earth')
-        .map((s) => ({
-          id: s.id,
-          name: s.name,
-          status: s.status,
-          category: s.category,
-          meanSlopeDeg: s.meanSlopeDeg,
-          triMeanM: s.triMeanM,
-          reliefM: s.reliefM,
-          waterIceScore: s.waterIceScore,
-          mineralogyClass: s.mineralogyClass,
-        })),
-      availableTargets: sites
-        .filter((s) => s.body !== 'Earth')
-        .map((s) => ({
-          id: s.id,
-          name: s.name,
-          body: s.body,
-          meanSlopeDeg: s.meanSlopeDeg,
-          triMeanM: s.triMeanM,
-          reliefM: s.reliefM,
-          waterIceScore: s.waterIceScore,
-          mineralogyClass: s.mineralogyClass,
-        })),
+      processedDatasets: processedDatasets.map((d) => ({
+        filename: d.filename,
+        format: d.format,
+        source: d.source,
+        isSyntheticCalibrationGrid:
+          d.id.startsWith('ds-calib-') ||
+          d.filename.startsWith('CALIBRATION_') ||
+          d.source.toLowerCase().includes('procedural calibration'),
+        planet: d.planet,
+        region: d.region,
+        crs: d.crs,
+        resolution: d.resolution,
+        qualityScore: d.qualityScore,
+        missingValueCount: d.missingValueCount,
+        elevationMinM: d.summaryStats?.elevationMinM ?? null,
+        elevationMaxM: d.summaryStats?.elevationMaxM ?? null,
+        elevationMeanM: d.summaryStats?.elevationMeanM ?? null,
+        reliefM: d.summaryStats?.reliefM ?? null,
+        meanSlopeDeg: d.summaryStats?.meanSlopeDeg ?? null,
+        triMeanM: d.summaryStats?.triMeanM ?? null,
+        hypsometricIntegral: d.summaryStats?.hypsometricIntegral ?? null,
+        notes: d.notes,
+      })),
+      pendingUnmountedDatasets: pendingDatasets.map((d) => ({
+        filename: d.filename,
+        format: d.format,
+        planet: d.planet,
+        region: d.region,
+        notes: d.notes,
+      })),
+      focusEarthSite: focusEarth ? serializeSite(focusEarth) : null,
+      focusPlanetaryTarget: focusTarget ? serializeSite(focusTarget) : null,
+      focusSimilarityEvaluation: focusComparison
+        ? {
+            overallScore: focusComparison.overallScore,
+            confidencePct: focusComparison.confidencePct,
+            missingVariables: focusComparison.missingVariables,
+            featureContributions: focusComparison.featureContributions.map((fc) => ({
+              feature: fc.feature,
+              score: fc.contributionScore,
+              earthValue: fc.earthValue,
+              targetValue: fc.targetValue,
+              available: fc.available,
+            })),
+          }
+        : null,
+      availableEarthSites: sites.filter((s) => s.body === 'Earth').map(serializeSite),
+      availableTargets: sites.filter((s) => s.body !== 'Earth').map(serializeSite),
     };
 
     const ai = getGeminiClient();
@@ -343,60 +389,174 @@ async function startServer() {
       return;
     }
 
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: `Researcher Question: ${question}\n\nDatabase Grounding Context:\n${JSON.stringify(dbContext, null, 2)}`,
-        config: {
-          systemInstruction:
-            'You are the VISION ASTRAA Planetary Geomorphology Research Assistant. Strictly separate verified facts retrieved from the provided Database Grounding Context from your scientific interpretations/hypotheses. Never fabricate dataset rows or pretend pending unmounted files have been read. Always remind the researcher of physical limitations (gravity, atmospheric pressure, radiation, planetary datum differences) when comparing Earth analogs with Moon or Mars.',
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              retrievedFacts: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description:
-                  'Exact verifiable facts, metrics, and dataset availability directly observed in the Database Grounding Context.',
-              },
-              scientificInterpretation: {
-                type: Type.STRING,
-                description:
-                  'Analytical interpretation and testable hypotheses grounded in planetary geology principles.',
-              },
-              limitationsAndCaveats: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description:
-                  'Physical differences (gravity, atmosphere, radiation, missing data, datum differences) that restrict the analogy.',
-              },
-              recommendedNextSteps: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: 'Concrete data validation or terrain comparison actions inside VISION ASTRAA.',
+    const sanitizedHistory = Array.isArray(history)
+      ? history
+          .slice(0, 3)
+          .reverse()
+          .filter((h) => h && typeof h.question === 'string' && h.question.trim())
+          .map((h, idx) => ({
+            turn: idx + 1,
+            question: h.question!.trim(),
+            priorSummary: h.scientificInterpretation?.slice(0, 450) ?? '',
+          }))
+      : [];
+
+    const promptSections = [
+      `Researcher Question: ${trimmedQuestion}`,
+      sanitizedHistory.length > 0
+        ? `Recent Conversation History (for follow-up context):\n${JSON.stringify(sanitizedHistory, null, 2)}`
+        : null,
+      `Database Grounding Context:\n${JSON.stringify(dbContext, null, 2)}`,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const callModelWithRetry = async () => {
+      const maxAttempts = 3;
+      let lastError: unknown = null;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          return await ai.models.generateContent({
+            model: 'gemini-4-hydrogen',
+            contents: promptSections,
+            config: {
+              thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
+              systemInstruction:
+                'You are the VISION ASTRAA Planetary Geomorphology Research Assistant. Strictly separate verified facts retrieved from the provided Database Grounding Context from your scientific interpretations/hypotheses. Never fabricate dataset rows or pretend pending unmounted files have been read. Explicitly note when a processed DEM is a synthetic calibration grid (isSyntheticCalibrationGrid: true) rather than a real orbital/SRTM observation. Always remind the researcher of physical limitations (gravity, atmospheric pressure, radiation, planetary datum/CRS differences) when comparing Earth analogs with Moon or Mars.',
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  retrievedFacts: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description:
+                      'Exact verifiable facts, metrics, and dataset availability directly observed in the Database Grounding Context.',
+                  },
+                  scientificInterpretation: {
+                    type: Type.STRING,
+                    description:
+                      'Analytical interpretation and testable hypotheses grounded in planetary geology principles.',
+                  },
+                  limitationsAndCaveats: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description:
+                      'Physical differences (gravity, atmosphere, radiation, missing data, datum differences) that restrict the analogy.',
+                  },
+                  recommendedNextSteps: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description:
+                      'Concrete data validation or terrain comparison actions inside VISION ASTRAA.',
+                  },
+                },
+                required: [
+                  'retrievedFacts',
+                  'scientificInterpretation',
+                  'limitationsAndCaveats',
+                  'recommendedNextSteps',
+                ],
               },
             },
-            required: [
-              'retrievedFacts',
-              'scientificInterpretation',
-              'limitationsAndCaveats',
-              'recommendedNextSteps',
-            ],
-          },
-        },
-      });
+          });
+        } catch (err) {
+          lastError = err;
+          const msg = err instanceof Error ? err.message : String(err);
+          const isTransient =
+            /429|500|502|503|504|RESOURCE_EXHAUSTED|UNAVAILABLE|ECONNRESET|ETIMEDOUT|fetch failed/i.test(
+              msg
+            );
+          if (!isTransient || attempt === maxAttempts) {
+            throw err;
+          }
+          await new Promise((r) => setTimeout(r, 600 * attempt));
+        }
+      }
+      throw lastError;
+    };
 
-      const parsed = JSON.parse((response.text ?? '{}').trim());
+    try {
+      const response = await callModelWithRetry();
+      const rawText = (response?.text ?? '').trim();
+      if (!rawText) {
+        const finishReason = response?.candidates?.[0]?.finishReason ?? 'UNKNOWN';
+        res.status(502).json({
+          error: `AI model returned an empty response (finishReason: ${finishReason}). Please rephrase or retry your inquiry.`,
+        });
+        return;
+      }
+
+      const cleanedJson = rawText
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+
+      let parsedRaw: Record<string, unknown>;
+      try {
+        parsedRaw = JSON.parse(cleanedJson) as Record<string, unknown>;
+      } catch {
+        res.status(502).json({
+          error: 'AI model output was not valid JSON. Please retry the inquiry.',
+        });
+        return;
+      }
+
+      const normalizeList = (val: unknown): string[] =>
+        Array.isArray(val)
+          ? val
+              .map((item) => (typeof item === 'string' ? item.trim() : String(item ?? '').trim()))
+              .filter(Boolean)
+          : [];
+
+      const normalized = {
+        retrievedFacts: normalizeList(parsedRaw.retrievedFacts),
+        scientificInterpretation:
+          typeof parsedRaw.scientificInterpretation === 'string' &&
+          parsedRaw.scientificInterpretation.trim()
+            ? parsedRaw.scientificInterpretation.trim()
+            : 'No scientific interpretation was generated for this query.',
+        limitationsAndCaveats: normalizeList(parsedRaw.limitationsAndCaveats),
+        recommendedNextSteps: normalizeList(parsedRaw.recommendedNextSteps),
+        model: 'gemini-4-hydrogen',
+        groundedSiteCount: sites.length,
+        groundedDatasetCount: processedDatasets.length,
+        generatedAt: new Date().toISOString(),
+      };
+
       logActivity(
         'AI Research Query',
         'AI Assistant',
-        `Analyzed query: "${question.slice(0, 72)}${question.length > 72 ? '...' : ''}"`
+        `Analyzed query: "${trimmedQuestion.slice(0, 72)}${trimmedQuestion.length > 72 ? '...' : ''}"`
       );
-      res.json(parsed);
+      res.json(normalized);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Gemini API request failed.';
-      res.status(500).json({ error: msg });
+      const rawMsg = err instanceof Error ? err.message : 'Gemini API request failed.';
+      console.error('[AI Research Error]', rawMsg);
+
+      if (/API_KEY_INVALID|PERMISSION_DENIED|401|403/i.test(rawMsg)) {
+        res.status(403).json({
+          error:
+            'Gemini API authentication failed. Please check that GEMINI_API_KEY is valid in Settings > Secrets.',
+        });
+        return;
+      }
+      if (/RESOURCE_EXHAUSTED|429|quota/i.test(rawMsg)) {
+        res.status(429).json({
+          error:
+            'Gemini API rate limit or quota reached. Wait a moment and retry, or verify your API quota in Settings > Secrets.',
+        });
+        return;
+      }
+      if (/NOT_FOUND|404/i.test(rawMsg)) {
+        res.status(502).json({
+          error: 'Requested Gemini model is currently unavailable. Please retry shortly.',
+        });
+        return;
+      }
+      res.status(502).json({
+        error: 'Unable to complete the AI research request right now. Please retry.',
+      });
     }
   });
 
