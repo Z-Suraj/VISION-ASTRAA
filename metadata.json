@@ -1,0 +1,6 @@
+{
+  "name": "VISION ASTRAA",
+  "description": "Earth, Moon & Mars Terrain Intelligence, Planetary Analogue Discovery, and Digital Twin Research Platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
