@@ -58,17 +58,19 @@ export default function App() {
         }),
       ]);
       const [ov, s, ds, rep, rank] = await Promise.all([
-        ovRes.json(),
-        sitesRes.json(),
-        dsRes.json(),
-        repRes.json(),
-        rankRes.json(),
+        ovRes.ok ? ovRes.json() : null,
+        sitesRes.ok ? sitesRes.json() : [],
+        dsRes.ok ? dsRes.json() : [],
+        repRes.ok ? repRes.json() : [],
+        rankRes.ok ? rankRes.json() : { results: [] },
       ]);
-      setOverview(ov);
-      setSites(s);
-      setDatasets(ds);
-      setReports(rep);
-      setTopMatches(rank.results ?? []);
+      if (ov) setOverview(ov);
+      if (Array.isArray(s)) setSites(s);
+      if (Array.isArray(ds)) setDatasets(ds);
+      if (Array.isArray(rep)) setReports(rep);
+      setTopMatches(Array.isArray(rank?.results) ? rank.results : []);
+    } catch {
+      // Prevent unhandled promise rejections if network/extension interceptor aborts a request
     } finally {
       setLoading(false);
     }
@@ -87,23 +89,29 @@ export default function App() {
     const processedIds = datasets
       .filter((d) => d.processingStatus === 'Processed')
       .map((d) => d.id);
-    await fetch('/api/reports', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: `Analogue Report: ${ev.earthSite.name} vs. ${ev.targetSite.name}`,
-        earthSiteId: ev.earthSite.id,
-        targetSiteId: ev.targetSite.id,
-        similarityScore: ev.overallScore,
-        confidencePct: ev.confidencePct,
-        methodology: `Configurable multi-parameter scoring (Slope ${weights.slope}, TRI ${weights.ruggedness}, Relief ${weights.relief}, Thermal ${weights.thermal}, Water/Ice ${weights.waterIce}, Mineralogy ${weights.mineralogy}).`,
-        findings: ev.explanation,
-        limitations: `${ev.limitationsSummary} Weathering caveat: ${ev.earthSite.limitations.weatheringCaveat}.`,
-        datasetIds: processedIds,
-      }),
-    });
-    await loadAllData();
-    navigateTo('reports');
+    try {
+      const res = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Analogue Report: ${ev.earthSite.name} vs. ${ev.targetSite.name}`,
+          earthSiteId: ev.earthSite.id,
+          targetSiteId: ev.targetSite.id,
+          similarityScore: ev.overallScore,
+          confidencePct: ev.confidencePct,
+          methodology: `Configurable multi-parameter scoring (Slope ${weights.slope}, TRI ${weights.ruggedness}, Relief ${weights.relief}, Thermal ${weights.thermal}, Water/Ice ${weights.waterIce}, Mineralogy ${weights.mineralogy}).`,
+          findings: ev.explanation,
+          limitations: `${ev.limitationsSummary} Weathering caveat: ${ev.earthSite.limitations.weatheringCaveat}.`,
+          datasetIds: processedIds,
+        }),
+      });
+      if (res.ok) {
+        await loadAllData();
+        navigateTo('reports');
+      }
+    } catch {
+      // Keep current comparison view stable if report submission fails
+    }
   };
 
   if (route === 'landing') {
