@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pause, Play, Volume2, VolumeX, X } from 'lucide-react';
+import AstraaLogo from './AstraaLogo.tsx';
 
 interface MissionVideoModalProps {
   open: boolean;
@@ -110,13 +111,16 @@ export default function MissionVideoModal({ open, onClose }: MissionVideoModalPr
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
       <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-700/80 bg-[#070c1b] shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3.5">
-          <div>
-            <h3 className="font-display text-base font-semibold text-white">
-              VISION ASTRAA Mission Briefing Loop
-            </h3>
-            <p className="text-xs text-slate-400">
-              Conceptual mission visualization · Real-time canvas synthesis (offline-safe)
-            </p>
+          <div className="flex items-center gap-3">
+            <AstraaLogo variant="icon" tone="dark" size="sm" />
+            <div>
+              <h3 className="font-display text-base font-semibold text-white">
+                VISION ASTRAA Mission Briefing Loop
+              </h3>
+              <p className="text-xs text-slate-400">
+                Conceptual mission visualization · Real-time canvas synthesis (offline-safe)
+              </p>
+            </div>
           </div>
           <button
             type="button"

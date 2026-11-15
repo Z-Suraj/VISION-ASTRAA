@@ -16,12 +16,13 @@ import {
   Send,
   X,
 } from 'lucide-react';
+import AstraaLogo from '../components/AstraaLogo.tsx';
 import CinematicBackdrop from '../components/CinematicBackdrop.tsx';
 import PlanetaryGlobe3D from '../components/PlanetaryGlobe3D.tsx';
 import SiteImage from '../components/SiteImage.tsx';
 import { formatLatLon, getAvailableDatasetsForSite } from '../utils/siteDatasets.ts';
 import type { AnalogSite, DatasetRecord, OverviewStats } from '../types/astraa.ts';
-import type { NavRoute } from './DashboardView.tsx';
+import type { NavRoute } from '../types/navigation.ts';
 
 interface LandingViewProps {
   overview: OverviewStats | null;
@@ -132,39 +133,13 @@ export default function LandingView({
       {/* Sticky Transparent Dark Navigation Bar — Mirrors Reference Screenshot */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#030612]/75 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-6 px-4 py-3.5 sm:px-8">
-          {/* Left: Brand Emblem & Wordmark */}
+          {/* Left: Official VISION ASTRAA Logo & Wordmark */}
           <button
             type="button"
             onClick={() => scrollToSection('home')}
-            className="flex items-center gap-3 text-left whitespace-nowrap shrink-0"
+            className="flex items-center text-left whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded-lg"
           >
-            <svg
-              viewBox="0 0 36 36"
-              className="h-8 w-8 shrink-0"
-              aria-hidden="true"
-            >
-              <defs>
-                <linearGradient id="astraaRing" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#22D3EE" />
-                  <stop offset="100%" stopColor="#6366F1" />
-                </linearGradient>
-              </defs>
-              <circle cx="18" cy="18" r="8" fill="url(#astraaRing)" opacity="0.9" />
-              <ellipse
-                cx="18"
-                cy="18"
-                rx="15"
-                ry="5.5"
-                transform="rotate(-28 18 18)"
-                fill="none"
-                stroke="#38BDF8"
-                strokeWidth="2"
-              />
-              <circle cx="29" cy="11" r="2" fill="#E0F2FE" />
-            </svg>
-            <span className="font-display text-base font-extrabold tracking-[0.14em] text-white sm:text-lg">
-              VISION ASTRAA
-            </span>
+            <AstraaLogo variant="compact" tone="dark" size="sm" />
           </button>
 
           {/* Center: Clean Single-Line Navigation Links */}
@@ -985,11 +960,9 @@ export default function LandingView({
       </section>
 
       {/* Quiet Footer */}
-      <footer className="border-t border-white/10 bg-[#030612] px-4 py-6 sm:px-8">
+      <footer className="border-t border-white/10 bg-[#030612] px-4 py-7 sm:px-8">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 text-xs text-slate-400">
-          <div className="font-display font-semibold text-slate-200">
-            VISION ASTRAA · Earth, Moon &amp; Mars Terrain Intelligence
-          </div>
+          <AstraaLogo variant="full" tone="dark" size="sm" />
           <div>
             NASA Space Apps Challenge · Public Research Access (No Authentication Required)
           </div>

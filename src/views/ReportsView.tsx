@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Download, FileText, Plus, Printer, Trash2 } from 'lucide-react';
+import AstraaLogo from '../components/AstraaLogo.tsx';
 import CinematicBackdrop from '../components/CinematicBackdrop.tsx';
 import type {
   AnalogSite,
@@ -79,7 +80,9 @@ export default function ReportsView({
   const handleDownloadMarkdown = (rep: ResearchReportRecord) => {
     const earth = sites.find((s) => s.id === rep.earthSiteId);
     const target = sites.find((s) => s.id === rep.targetSiteId);
-    const md = `# ${rep.title}
+    const md = `**VISION ASTRAA** — *Explore Worlds. Discover Analogues. Advance Exploration.*
+
+# ${rep.title}
 
 Generated: ${rep.createdAt}
 Weighted Similarity Score: ${rep.similarityScore}% (Data Confidence: ${rep.confidencePct}%)
@@ -217,15 +220,21 @@ ${rep.limitations}
         <div className="rounded-xl border border-slate-800/80 bg-[#080f23]/95 p-6 backdrop-blur-md lg:col-span-8">
           {activeReport ? (
             <article className="space-y-5">
-              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800 pb-4">
-                <div>
-                  <div className="font-mono text-[11px] text-cyan-300">
-                    VISION ASTRAA SCIENTIFIC REPORT · {activeReport.id}
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800 print:border-slate-300 pb-4">
+                <div className="space-y-2">
+                  <div className="print:hidden">
+                    <AstraaLogo variant="full" tone="dark" size="sm" />
                   </div>
-                  <h2 className="mt-1 font-display text-xl font-bold text-white">
+                  <div className="hidden print:inline-flex">
+                    <AstraaLogo variant="full" tone="light" size="sm" />
+                  </div>
+                  <div className="font-mono text-[11px] text-cyan-300 print:text-sky-700 pt-1">
+                    SCIENTIFIC ANALOGUE REPORT · {activeReport.id}
+                  </div>
+                  <h2 className="mt-1 font-display text-xl font-bold text-white print:text-slate-900">
                     {activeReport.title}
                   </h2>
-                  <p className="mt-1 font-mono text-xs text-slate-400">
+                  <p className="mt-1 font-mono text-xs text-slate-400 print:text-slate-600">
                     Generated {new Date(activeReport.createdAt).toLocaleString()}
                   </p>
                 </div>

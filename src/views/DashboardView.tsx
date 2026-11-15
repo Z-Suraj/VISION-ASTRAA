@@ -10,6 +10,7 @@ import {
   Play,
   Sparkles,
 } from 'lucide-react';
+import AstraaLogo from '../components/AstraaLogo.tsx';
 import PlanetaryGlobe3D from '../components/PlanetaryGlobe3D.tsx';
 import TerrainMesh3D from '../components/TerrainMesh3D.tsx';
 import CinematicBackdrop from '../components/CinematicBackdrop.tsx';
@@ -21,17 +22,9 @@ import type {
   PlanetaryBody,
   SimilarityEvaluation,
 } from '../types/astraa.ts';
+import type { NavRoute } from '../types/navigation.ts';
 
-export type NavRoute =
-  | 'dashboard'
-  | 'explorer'
-  | 'comparison'
-  | 'analogs'
-  | 'datacenter'
-  | 'vizlab'
-  | 'assistant'
-  | 'reports'
-  | 'settings';
+export type { NavRoute };
 
 interface DashboardViewProps {
   overview: OverviewStats | null;
@@ -71,14 +64,17 @@ export default function DashboardView({
 
           {/* Left Hero Copy */}
           <div className="relative z-10 max-w-2xl space-y-4">
-            <div className="text-xs font-medium tracking-wide text-cyan-300">
-              NASA Space Apps Challenge · Conceptual Mission Visualization
+            <div className="flex flex-wrap items-center gap-3">
+              <AstraaLogo variant="icon" tone="dark" size="md" />
+              <div className="text-xs font-medium tracking-wide text-cyan-300">
+                NASA Space Apps Challenge · Planetary Digital Twin Platform
+              </div>
             </div>
             <h1 className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl text-balance">
               VISION <span className="text-cyan-400">ASTRAA</span>
             </h1>
             <p className="text-base font-medium text-slate-200 sm:text-lg">
-              Earth, Moon &amp; Mars Terrain Intelligence and Digital Twin Platform
+              Explore Worlds. Discover Analogues. Advance Exploration.
             </p>
             <p className="max-w-xl text-sm leading-relaxed text-slate-300">
               Characterize candidate terrestrial analogues across deserts, polar regions, impact

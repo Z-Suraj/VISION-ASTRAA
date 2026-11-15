@@ -12,18 +12,33 @@ interface ExplorerViewProps {
   sites: AnalogSite[];
   datasets: DatasetRecord[];
   initialSelectedSiteId?: string | null;
+  initialBody?: PlanetaryBody;
 }
 
 export default function ExplorerView({
   sites,
   datasets,
   initialSelectedSiteId,
+  initialBody,
 }: ExplorerViewProps) {
-  const [body, setBody] = useState<PlanetaryBody>('Earth');
+  const [body, setBody] = useState<PlanetaryBody>(initialBody ?? 'Earth');
   const [viewMode, setViewMode] = useState<'split' | '3d' | '2d'>('3d');
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(
     initialSelectedSiteId ?? 'earth-ladakh'
   );
+
+  useEffect(() => {
+    if (initialBody) {
+      setBody(initialBody);
+      const matchingSelected = sites.find(
+        (s) => s.id === selectedSiteId && s.body === initialBody
+      );
+      if (!matchingSelected) {
+        const firstForBody = sites.find((s) => s.body === initialBody);
+        setSelectedSiteId(firstForBody?.id ?? null);
+      }
+    }
+  }, [initialBody, sites]);
 
   useEffect(() => {
     if (initialSelectedSiteId) {

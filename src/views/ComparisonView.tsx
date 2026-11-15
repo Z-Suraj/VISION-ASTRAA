@@ -7,10 +7,12 @@ import {
 import TerrainMesh3D from '../components/TerrainMesh3D.tsx';
 import CinematicBackdrop from '../components/CinematicBackdrop.tsx';
 import SiteImage from '../components/SiteImage.tsx';
+import TerrainSimilarityTable from '../components/TerrainSimilarityTable.tsx';
 import type {
   AnalogSite,
   DatasetRecord,
   SimilarityEvaluation,
+  SimilarityMatrixResponse,
   SimilarityWeights,
 } from '../types/astraa.ts';
 
@@ -19,6 +21,7 @@ interface ComparisonViewProps {
   datasets: DatasetRecord[];
   weights: SimilarityWeights;
   onCreateReportFromComparison: (evaluation: SimilarityEvaluation) => Promise<void>;
+  focusMode?: 'studio' | 'matrix';
 }
 
 export default function ComparisonView({
@@ -26,6 +29,7 @@ export default function ComparisonView({
   datasets,
   weights,
   onCreateReportFromComparison,
+  focusMode = 'studio',
 }: ComparisonViewProps) {
   const earthSites = useMemo(() => sites.filter((s) => s.body === 'Earth'), [sites]);
   const targetSites = useMemo(() => sites.filter((s) => s.body !== 'Earth'), [sites]);
@@ -33,7 +37,9 @@ export default function ComparisonView({
   const [earthId, setEarthId] = useState<string>('earth-ladakh');
   const [targetId, setTargetId] = useState<string>('mars-jezero');
   const [evaluation, setEvaluation] = useState<SimilarityEvaluation | null>(null);
+  const [matrix, setMatrix] = useState<SimilarityMatrixResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [matrixLoading, setMatrixLoading] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
 
@@ -56,6 +62,26 @@ export default function ComparisonView({
       active = false;
     };
   }, [earthId, targetId, weights]);
+
+  useEffect(() => {
+    let active = true;
+    setMatrixLoading(true);
+    fetch('/api/similarity/matrix', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weights }),
+    })
+      .then((r) => r.json())
+      .then((data: SimilarityMatrixResponse) => {
+        if (active) setMatrix(data);
+      })
+      .finally(() => {
+        if (active) setMatrixLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [weights, sites, datasets]);
 
   const earthDem = useMemo(
     () =>
@@ -99,10 +125,15 @@ export default function ComparisonView({
         />
         <div className="relative z-10 flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-1 max-w-xl">
-            <h1 className="font-display text-xl font-bold text-white">Terrain Comparison Studio</h1>
+            <h1 className="font-display text-xl font-bold text-white">
+              {focusMode === 'matrix'
+                ? 'Planetary Similarity Results'
+                : 'Terrain Comparison Studio'}
+            </h1>
             <p className="text-xs text-slate-300">
-              Cross-planet morphometric and environmental comparison using datum-independent relative
-              relief, Horn slope, Riley TRI, and explicit physical limitations.
+              {focusMode === 'matrix'
+                ? 'Cross-planet similarity rankings across all 54 Earth analogue and Moon/Mars region pairs, separating demonstration baselines from processed DEM runs.'
+                : 'Cross-planet morphometric and environmental comparison using datum-independent relative relief, Horn slope, Riley TRI, and explicit physical limitations.'}
             </p>
           </div>
 
@@ -157,6 +188,18 @@ export default function ComparisonView({
           {savedNotice}
         </div>
       )}
+
+      {/* Signature Interactive Planetary Terrain Similarity Comparison Table */}
+      <TerrainSimilarityTable
+        matrix={matrix}
+        loading={matrixLoading}
+        selectedEarthId={earthId}
+        selectedTargetId={targetId}
+        onSelectPair={(newEarthId, newTargetId) => {
+          setEarthId(newEarthId);
+          setTargetId(newTargetId);
+        }}
+      />
 
       {/* Side-by-side Site Summary & Visual Comparison */}
       {evaluation && (

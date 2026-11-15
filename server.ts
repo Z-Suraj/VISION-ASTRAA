@@ -18,6 +18,7 @@ import {
   upsertSite,
 } from './src/server/db.ts';
 import {
+  buildSimilarityMatrix,
   computeMorphometricClusters,
   evaluateSimilarity,
   ingestUploadedBuffer,
@@ -137,6 +138,25 @@ async function startServer() {
       mineralogy: Number(weights?.mineralogy ?? DEFAULT_WEIGHTS.mineralogy),
     };
     res.json(evaluateSimilarity(earth, target, mergedWeights));
+  });
+
+  app.post('/api/similarity/matrix', (req, res) => {
+    const { weights } = (req.body ?? {}) as {
+      weights?: Partial<SimilarityWeights>;
+    };
+    const mergedWeights: SimilarityWeights = {
+      slope: Number(weights?.slope ?? DEFAULT_WEIGHTS.slope),
+      ruggedness: Number(weights?.ruggedness ?? DEFAULT_WEIGHTS.ruggedness),
+      relief: Number(weights?.relief ?? DEFAULT_WEIGHTS.relief),
+      thermal: Number(weights?.thermal ?? DEFAULT_WEIGHTS.thermal),
+      waterIce: Number(weights?.waterIce ?? DEFAULT_WEIGHTS.waterIce),
+      mineralogy: Number(weights?.mineralogy ?? DEFAULT_WEIGHTS.mineralogy),
+    };
+    res.json(buildSimilarityMatrix(getAllSites(), getAllDatasets(), mergedWeights));
+  });
+
+  app.get('/api/similarity/matrix', (_req, res) => {
+    res.json(buildSimilarityMatrix(getAllSites(), getAllDatasets(), DEFAULT_WEIGHTS));
   });
 
   app.get('/api/clustering', (req, res) => {

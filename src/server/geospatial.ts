@@ -9,7 +9,10 @@ import type {
   MorphometricNormalization,
   MorphometricPoint,
   PlanetaryBody,
+  SimilarityAnalysisStatus,
   SimilarityEvaluation,
+  SimilarityMatrixResponse,
+  SimilarityMatrixRow,
   SimilarityWeights,
   SpatialExtent,
   TerrainCategory,
@@ -1321,4 +1324,153 @@ export function computeMorphometricClusters(
     generatedAt: new Date().toISOString(),
   };
 }
+
+const CURATED_DEMONSTRATION_PAIRS = new Set<string>([
+  'earth-ladakh::mars-jezero',
+  'earth-atacama::mars-gale',
+  'earth-atacama::mars-jezero',
+  'earth-haughton::mars-jezero',
+  'earth-haughton::moon-shackleton',
+  'earth-dry-valleys::moon-shackleton',
+  'earth-dry-valleys::mars-gale',
+  'earth-iceland::moon-mare-tranq',
+  'earth-iceland::moon-aristarchus',
+  'earth-lonar::mars-jezero',
+  'earth-spiti::mars-valles',
+  'earth-death-valley::mars-valles',
+  'earth-rann-kutch::mars-gale',
+]);
+
+export function buildSimilarityMatrix(
+  sites: AnalogSite[],
+  datasets: DatasetRecord[],
+  weights: SimilarityWeights
+): SimilarityMatrixResponse {
+  const earthSites = sites.filter((s) => s.body === 'Earth');
+  const targetSites = sites.filter((s) => s.body !== 'Earth');
+  const processedRealDatasets = datasets.filter(
+    (d) => d.processingStatus === 'Processed' && !d.id.startsWith('ds-calib-')
+  );
+
+  const rows: SimilarityMatrixRow[] = [];
+
+  for (const earth of earthSites) {
+    const earthProv = matchSiteProvenance(earth, processedRealDatasets);
+    for (const target of targetSites) {
+      const targetProv = matchSiteProvenance(target, processedRealDatasets);
+      const evalResult = evaluateSimilarity(earth, target, weights);
+
+      const findFeature = (prefix: string) =>
+        evalResult.featureContributions.find((c) => c.feature.startsWith(prefix));
+
+      const slopeFc = findFeature('Mean Surface Slope');
+      const triFc = findFeature('Terrain Ruggedness');
+      const reliefFc = findFeature('Relative Topographic Relief');
+      const thermalFc = findFeature('Thermal Envelope');
+      const waterFc = findFeature('Water / Ice');
+      const geoFc = findFeature('Geology & Mineralogy');
+
+      // Environmental Similarity combines available Thermal Envelope and Water/Ice indicators
+      const envComponents: number[] = [];
+      if (thermalFc?.available) envComponents.push(thermalFc.contributionScore);
+      if (waterFc?.available) envComponents.push(waterFc.contributionScore);
+      const environmentalSim =
+        envComponents.length > 0
+          ? Math.round((envComponents.reduce((a, b) => a + b, 0) / envComponents.length) * 10) / 10
+          : null;
+
+      const pairId = `${earth.id}::${target.id}`;
+      const bothDem =
+        earthProv.dataCategory === 'Measured / Processed DEM' &&
+        targetProv.dataCategory === 'Measured / Processed DEM';
+      const partialDem =
+        earthProv.dataCategory === 'Measured / Processed DEM' ||
+        targetProv.dataCategory === 'Measured / Processed DEM' ||
+        earthProv.dataCategory === 'Uploaded Local Dataset' ||
+        targetProv.dataCategory === 'Uploaded Local Dataset';
+
+      const isCuratedDemo = CURATED_DEMONSTRATION_PAIRS.has(pairId);
+
+      let analysisStatus: SimilarityAnalysisStatus;
+      if (bothDem) {
+        analysisStatus = 'DEM-Grounded (Measured)';
+      } else if (isCuratedDemo) {
+        analysisStatus = 'DEMONSTRATION / SIMULATED';
+      } else if (partialDem) {
+        analysisStatus = 'Partial DEM + Baseline';
+      } else {
+        analysisStatus = 'Simulated Baseline';
+      }
+
+      const dataQualityLabel: SimilarityMatrixRow['dataQualityLabel'] =
+        evalResult.confidencePct >= 90
+          ? 'High'
+          : evalResult.confidencePct >= 80
+            ? 'Good'
+            : evalResult.confidencePct >= 65
+              ? 'Moderate'
+              : 'Partial';
+
+      rows.push({
+        pairId,
+        earthSiteId: earth.id,
+        earthSiteName: earth.name,
+        earthShortName: earth.name.split('(')[0].trim(),
+        earthStatus: earth.status,
+        earthCategory: earth.category,
+        targetId: target.id,
+        targetBody: target.body,
+        targetName: target.name,
+        targetShortName: target.name.split('(')[0].trim(),
+        targetCategory: target.category,
+        meanSlopeSim: slopeFc?.available ? slopeFc.contributionScore : null,
+        triSim: triFc?.available ? triFc.contributionScore : null,
+        elevationSim: reliefFc?.available ? reliefFc.contributionScore : null,
+        geomorphologicalSim: geoFc?.available ? geoFc.contributionScore : 0,
+        environmentalSim,
+        overallSimilarityPct: evalResult.overallScore,
+        confidencePct: evalResult.confidencePct,
+        dataQualityLabel,
+        missingCount: evalResult.missingVariables.length,
+        missingVariables: evalResult.missingVariables,
+        analysisStatus,
+        isDemonstration: analysisStatus === 'DEMONSTRATION / SIMULATED' || analysisStatus === 'Simulated Baseline',
+        earthValueSlope: slopeFc?.earthValue ?? 'Unavailable',
+        targetValueSlope: slopeFc?.targetValue ?? 'Unavailable',
+        earthValueTri: triFc?.earthValue ?? 'Unavailable',
+        targetValueTri: triFc?.targetValue ?? 'Unavailable',
+        earthValueRelief: reliefFc?.earthValue ?? 'Unavailable',
+        targetValueRelief: reliefFc?.targetValue ?? 'Unavailable',
+        earthProvenance: earthProv.processingStatus,
+        targetProvenance: targetProv.processingStatus,
+        explanation: evalResult.explanation,
+      });
+    }
+  }
+
+  // Sort Demonstration flagship pairs first by default, then highest overall similarity
+  rows.sort((a, b) => {
+    if (a.analysisStatus === 'DEMONSTRATION / SIMULATED' && b.analysisStatus !== 'DEMONSTRATION / SIMULATED') {
+      return -1;
+    }
+    if (b.analysisStatus === 'DEMONSTRATION / SIMULATED' && a.analysisStatus !== 'DEMONSTRATION / SIMULATED') {
+      return 1;
+    }
+    return b.overallSimilarityPct - a.overallSimilarityPct;
+  });
+
+  return {
+    rows,
+    weights,
+    totalPairs: rows.length,
+    demonstrationCount: rows.filter((r) => r.analysisStatus === 'DEMONSTRATION / SIMULATED').length,
+    demGroundedCount: rows.filter((r) => r.analysisStatus === 'DEM-Grounded (Measured)').length,
+    datumNote:
+      'Elevation Similarity compares datum-independent Relative Topographic Relief spans (never raw EGM96 vs. LOLA/MOLA zero-datums).',
+    simulationNotice:
+      'Rows labelled DEMONSTRATION / SIMULATED or Simulated Baseline compute multi-factor scores across published literature parameters and partial Earth DEMs pending co-registered Moon/Mars orbital DEM uploads.',
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 

@@ -258,3 +258,56 @@ export interface MorphometricClusteringResult {
   generatedAt: string;
 }
 
+export type SimilarityAnalysisStatus =
+  | 'DEMONSTRATION / SIMULATED'
+  | 'DEM-Grounded (Measured)'
+  | 'Partial DEM + Baseline'
+  | 'Simulated Baseline';
+
+export interface SimilarityMatrixRow {
+  pairId: string;
+  earthSiteId: string;
+  earthSiteName: string;
+  earthShortName: string;
+  earthStatus: SiteStatus;
+  earthCategory: TerrainCategory;
+  targetId: string;
+  targetBody: PlanetaryBody;
+  targetName: string;
+  targetShortName: string;
+  targetCategory: TerrainCategory;
+  meanSlopeSim: number | null;
+  triSim: number | null;
+  elevationSim: number | null;
+  geomorphologicalSim: number;
+  environmentalSim: number | null;
+  overallSimilarityPct: number;
+  confidencePct: number;
+  dataQualityLabel: 'High' | 'Good' | 'Moderate' | 'Partial';
+  missingCount: number;
+  missingVariables: string[];
+  analysisStatus: SimilarityAnalysisStatus;
+  isDemonstration: boolean;
+  earthValueSlope: string;
+  targetValueSlope: string;
+  earthValueTri: string;
+  targetValueTri: string;
+  earthValueRelief: string;
+  targetValueRelief: string;
+  earthProvenance: string;
+  targetProvenance: string;
+  explanation: string;
+}
+
+export interface SimilarityMatrixResponse {
+  rows: SimilarityMatrixRow[];
+  weights: SimilarityWeights;
+  totalPairs: number;
+  demonstrationCount: number;
+  demGroundedCount: number;
+  datumNote: string;
+  simulationNotice: string;
+  generatedAt: string;
+}
+
+

@@ -14,11 +14,13 @@ import type { AnalogSite, DatasetRecord } from '../types/astraa.ts';
 interface VisualizationLabViewProps {
   datasets: DatasetRecord[];
   sites: AnalogSite[];
+  focusMode?: 'full' | 'morphometrics';
 }
 
 export default function VisualizationLabView({
   datasets,
   sites,
+  focusMode = 'full',
 }: VisualizationLabViewProps) {
   const terrainDatasets = useMemo(
     () => datasets.filter((d) => d.processingStatus === 'Processed' && d.summaryStats),
@@ -28,6 +30,35 @@ export default function VisualizationLabView({
   const [selectedDsId, setSelectedDsId] = useState<string>(terrainDatasets[0]?.id ?? '');
   const activeDs =
     terrainDatasets.find((d) => d.id === selectedDsId) ?? terrainDatasets[0] ?? null;
+
+  if (focusMode === 'morphometrics') {
+    return (
+      <div className="space-y-6">
+        <div className="relative overflow-hidden rounded-xl border border-slate-800/80 bg-[#080f23]/90 p-5 backdrop-blur-md">
+          <CinematicBackdrop
+            src="/assets/geological/impact_crater_basalt.webp"
+            alt="Cross-planet morphometric terrain clustering backdrop"
+            eager
+            opacityClass="opacity-35"
+            scrimClass="bg-gradient-to-r from-[#050814]/95 via-[#050814]/82 to-[#050814]/65"
+          />
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <BarChart3 className="h-5 w-5 text-cyan-400" />
+              <div>
+                <h1 className="font-display text-xl font-bold text-white">Morphometric Analysis</h1>
+                <p className="text-xs text-slate-300">
+                  Datum-independent Mean Surface Slope vs. Riley Terrain Ruggedness Index (TRI)
+                  clustering across Earth analogues, Moon targets, and Mars targets.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <MorphometricScatterChart sites={sites} datasets={datasets} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
