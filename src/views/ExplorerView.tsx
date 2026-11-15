@@ -1,25 +1,47 @@
-import { useMemo, useState } from 'react';
-import { Globe2, Layers, Map as MapIcon, Mountain, Thermometer } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Database, Globe2, Layers, Map as MapIcon, Mountain, Thermometer } from 'lucide-react';
 import LeafletMapExplorer from '../components/LeafletMapExplorer.tsx';
 import PlanetaryGlobe3D from '../components/PlanetaryGlobe3D.tsx';
 import TerrainMesh3D from '../components/TerrainMesh3D.tsx';
 import CinematicBackdrop from '../components/CinematicBackdrop.tsx';
 import SiteImage from '../components/SiteImage.tsx';
+import { formatLatLon, getAvailableDatasetsForSite } from '../utils/siteDatasets.ts';
 import type { AnalogSite, DatasetRecord, PlanetaryBody } from '../types/astraa.ts';
 
 interface ExplorerViewProps {
   sites: AnalogSite[];
   datasets: DatasetRecord[];
+  initialSelectedSiteId?: string | null;
 }
 
-export default function ExplorerView({ sites, datasets }: ExplorerViewProps) {
+export default function ExplorerView({
+  sites,
+  datasets,
+  initialSelectedSiteId,
+}: ExplorerViewProps) {
   const [body, setBody] = useState<PlanetaryBody>('Earth');
-  const [viewMode, setViewMode] = useState<'split' | '3d' | '2d'>('split');
-  const [selectedSiteId, setSelectedSiteId] = useState<string | null>('earth-ladakh');
+  const [viewMode, setViewMode] = useState<'split' | '3d' | '2d'>('3d');
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(
+    initialSelectedSiteId ?? 'earth-ladakh'
+  );
+
+  useEffect(() => {
+    if (initialSelectedSiteId) {
+      const target = sites.find((s) => s.id === initialSelectedSiteId);
+      if (target) {
+        setBody(target.body);
+        setSelectedSiteId(target.id);
+      }
+    }
+  }, [initialSelectedSiteId, sites]);
 
   const bodySites = useMemo(() => sites.filter((s) => s.body === body), [sites, body]);
   const activeSite =
     bodySites.find((s) => s.id === selectedSiteId) ?? bodySites[0] ?? null;
+  const activeSiteDatasets = useMemo(
+    () => (activeSite ? getAvailableDatasetsForSite(activeSite, datasets) : []),
+    [activeSite, datasets]
+  );
 
   const matchingTerrainDataset = useMemo(
     () =>
@@ -135,7 +157,7 @@ export default function ExplorerView({ sites, datasets }: ExplorerViewProps) {
                 sites={sites}
                 selectedSiteId={activeSite?.id}
                 onSelectSite={(s) => setSelectedSiteId(s.id)}
-                heightClass={viewMode === '3d' ? 'h-[480px]' : 'h-[400px]'}
+                heightClass={viewMode === '3d' ? 'h-[500px] lg:h-[580px]' : 'h-[420px]'}
               />
             )}
             {(viewMode === 'split' || viewMode === '2d') && (
@@ -145,7 +167,7 @@ export default function ExplorerView({ sites, datasets }: ExplorerViewProps) {
                 datasets={datasets}
                 selectedSiteId={activeSite?.id}
                 onSelectSite={(s) => setSelectedSiteId(s.id)}
-                heightClass={viewMode === '2d' ? 'h-[480px]' : 'h-[400px]'}
+                heightClass={viewMode === '2d' ? 'h-[500px] lg:h-[580px]' : 'h-[420px]'}
               />
             )}
           </div>
@@ -222,9 +244,17 @@ export default function ExplorerView({ sites, datasets }: ExplorerViewProps) {
               </div>
 
               <div>
-                <h3 className="font-display text-base font-bold text-white">{activeSite.name}</h3>
-                <p className="text-xs text-slate-400">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-display text-base font-bold text-white">{activeSite.name}</h3>
+                  <span className="rounded bg-cyan-500/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-cyan-300">
+                    {activeSite.category}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-300">
                   {activeSite.region} · {activeSite.countryOrSector}
+                </p>
+                <p className="mt-1 font-mono text-[11px] text-cyan-200">
+                  {formatLatLon(activeSite.latitude, activeSite.longitude)} · {activeSite.status}
                 </p>
               </div>
 
@@ -256,6 +286,47 @@ export default function ExplorerView({ sites, datasets }: ExplorerViewProps) {
                       : 'Unavailable'}
                   </div>
                 </div>
+              </div>
+
+              {/* Available Dataset Information from SQLite */}
+              <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-xs space-y-2">
+                <div className="flex items-center gap-1.5 font-display text-xs font-semibold text-white">
+                  <Database className="h-3.5 w-3.5 text-cyan-400" />
+                  Available Dataset Information
+                </div>
+                {activeSiteDatasets.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {activeSiteDatasets.map(({ dataset, matchReason }) => (
+                      <div
+                        key={dataset.id}
+                        className="rounded border border-slate-800/80 bg-[#050916]/80 px-2.5 py-1.5 text-[11px]"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate font-mono text-slate-200">
+                            {dataset.filename}
+                          </span>
+                          <span
+                            className={`shrink-0 font-mono text-[10px] ${
+                              dataset.processingStatus === 'Processed'
+                                ? 'text-emerald-300'
+                                : 'text-amber-300'
+                            }`}
+                          >
+                            {dataset.processingStatus === 'Processed'
+                              ? 'Processed'
+                              : 'Awaiting Upload'}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 text-[10px] text-slate-400">{matchReason}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-slate-400">
+                    Literature baseline only ({activeSite.dataCompletenessPct}% metadata completeness).
+                    Upload regional DEM tiles in Data Center to attach gridded measurements.
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2 text-xs">

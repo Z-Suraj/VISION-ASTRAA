@@ -72,6 +72,7 @@ export default function App() {
   const [topMatches, setTopMatches] = useState<SimilarityEvaluation[]>([]);
   const [weights, setWeights] = useState<SimilarityWeights>(DEFAULT_WEIGHTS);
   const [loading, setLoading] = useState(true);
+  const [selectedExplorerSiteId, setSelectedExplorerSiteId] = useState<string | null>(null);
 
   const loadAllData = useCallback(async () => {
     try {
@@ -150,7 +151,12 @@ export default function App() {
       <>
         <LandingView
           overview={overview}
-          onEnterApp={(target) => navigateTo(target)}
+          sites={sites}
+          datasets={datasets}
+          onEnterApp={(target, siteId) => {
+            if (siteId) setSelectedExplorerSiteId(siteId);
+            navigateTo(target);
+          }}
           onOpenDemo={() => setMissionVideoOpen(true)}
         />
         <MissionVideoModal
@@ -317,6 +323,7 @@ export default function App() {
                     type="button"
                     onClick={() => {
                       setSearchQuery('');
+                      setSelectedExplorerSiteId(s.id);
                       setRoute('explorer');
                     }}
                     className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs hover:bg-slate-800"
@@ -368,7 +375,11 @@ export default function App() {
                 />
               )}
               {route === 'explorer' && (
-                <ExplorerView sites={sites} datasets={datasets} />
+                <ExplorerView
+                  sites={sites}
+                  datasets={datasets}
+                  initialSelectedSiteId={selectedExplorerSiteId}
+                />
               )}
               {route === 'comparison' && (
                 <ComparisonView

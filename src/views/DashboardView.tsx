@@ -50,7 +50,7 @@ export default function DashboardView({
   onNavigate,
   onOpenMissionVideo,
 }: DashboardViewProps) {
-  const [heroBody, setHeroBody] = useState<PlanetaryBody>('Mars');
+  const [heroBody, setHeroBody] = useState<PlanetaryBody>('Earth');
   const [selectedGlobeSite, setSelectedGlobeSite] = useState<AnalogSite | null>(null);
 
   const processedTerrainDs =

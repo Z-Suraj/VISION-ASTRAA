@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import {
   ArrowDown,
   ArrowRight,
@@ -17,23 +17,30 @@ import {
   X,
 } from 'lucide-react';
 import CinematicBackdrop from '../components/CinematicBackdrop.tsx';
+import PlanetaryGlobe3D from '../components/PlanetaryGlobe3D.tsx';
 import SiteImage from '../components/SiteImage.tsx';
-import type { OverviewStats } from '../types/astraa.ts';
+import { formatLatLon, getAvailableDatasetsForSite } from '../utils/siteDatasets.ts';
+import type { AnalogSite, DatasetRecord, OverviewStats } from '../types/astraa.ts';
 import type { NavRoute } from './DashboardView.tsx';
 
 interface LandingViewProps {
   overview: OverviewStats | null;
-  onEnterApp: (targetRoute: NavRoute) => void;
+  sites: AnalogSite[];
+  datasets: DatasetRecord[];
+  onEnterApp: (targetRoute: NavRoute, siteId?: string) => void;
   onOpenDemo: () => void;
 }
 
 export default function LandingView({
   overview,
+  sites,
+  datasets,
   onEnterApp,
   onOpenDemo,
 }: LandingViewProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [activeNav, setActiveNav] = useState<'home' | 'features' | 'about' | 'resources' | 'contact'>('home');
+  const [activeNav, setActiveNav] = useState<'home' | 'globe' | 'features' | 'about' | 'resources' | 'contact'>('home');
+  const [selectedEarthSiteId, setSelectedEarthSiteId] = useState<string>('earth-ladakh');
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactOrg, setContactOrg] = useState('');
@@ -41,7 +48,17 @@ export default function LandingView({
   const [contactSubmitted, setContactSubmitted] = useState(false);
   const [contactError, setContactError] = useState<string | null>(null);
 
-  const scrollToSection = (id: 'home' | 'features' | 'about' | 'resources' | 'contact') => {
+  const earthSites = useMemo(() => sites.filter((s) => s.body === 'Earth'), [sites]);
+  const selectedEarthSite = useMemo(
+    () => earthSites.find((s) => s.id === selectedEarthSiteId) ?? earthSites[0] ?? null,
+    [earthSites, selectedEarthSiteId]
+  );
+  const selectedSiteDatasets = useMemo(
+    () => (selectedEarthSite ? getAvailableDatasetsForSite(selectedEarthSite, datasets) : []),
+    [selectedEarthSite, datasets]
+  );
+
+  const scrollToSection = (id: 'home' | 'globe' | 'features' | 'about' | 'resources' | 'contact') => {
     setActiveNav(id);
     setMobileNavOpen(false);
     if (id === 'home') {
@@ -398,12 +415,198 @@ export default function LandingView({
             <div className="flex justify-center">
               <button
                 type="button"
-                onClick={() => scrollToSection('features')}
+                onClick={() => scrollToSection('globe')}
                 className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#070d1f]/80 px-4 py-1.5 text-xs text-slate-300 backdrop-blur-sm transition-colors hover:border-cyan-400/50 hover:text-cyan-200"
               >
-                <span>Scroll to Explore</span>
+                <span>Scroll to Explore 3D Earth Globe</span>
                 <ArrowDown className="h-3.5 w-3.5 text-cyan-400" />
               </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 1.5: Interactive 3D Earth Analogues Globe (Centerpiece Three.js Experience) */}
+      <section id="globe" className="relative overflow-hidden border-b border-white/10 bg-[#030612]">
+        <div className="mx-auto max-w-[1400px] px-4 py-16 sm:px-8 lg:py-20">
+          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-5">
+            <div className="max-w-2xl">
+              <p className="font-mono text-xs uppercase tracking-widest text-cyan-400">
+                Interactive 3D Earth Observatory
+              </p>
+              <h2 className="mt-1.5 font-display text-2xl font-bold text-white sm:text-4xl text-balance">
+                Terrestrial Analogue Sites on a Live 3D Earth
+              </h2>
+              <p className="mt-2 text-sm text-slate-300">
+                Drag to rotate, scroll or pinch to zoom, and select any of the 9 planetary analogue
+                beacons to inspect verified coordinates, classification, and available datasets.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onEnterApp('explorer', selectedEarthSite?.id)}
+              className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2.5 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/20 whitespace-nowrap"
+            >
+              <span>Open Full Planetary Explorer</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
+            {/* Centerpiece 3D Three.js Earth Globe */}
+            <div className="lg:col-span-8">
+              <PlanetaryGlobe3D
+                body="Earth"
+                sites={sites}
+                selectedSiteId={selectedEarthSite?.id}
+                onSelectSite={(site) => setSelectedEarthSiteId(site.id)}
+                heightClass="h-[460px] sm:h-[540px] lg:h-[600px]"
+              />
+            </div>
+
+            {/* Minimal Scientific Region Inspector & 9-Site Selector */}
+            <div className="space-y-4 lg:col-span-4">
+              {selectedEarthSite ? (
+                <div className="rounded-xl border border-white/12 bg-[#080f23]/92 p-5 space-y-4">
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-3">
+                    <div>
+                      <div className="font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+                        Selected Earth Analogue
+                      </div>
+                      <h3 className="mt-1 font-display text-lg font-bold text-white">
+                        {selectedEarthSite.name}
+                      </h3>
+                    </div>
+                    <span className="shrink-0 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-cyan-300">
+                      {selectedEarthSite.category}
+                    </span>
+                  </div>
+
+                  <dl className="grid grid-cols-1 gap-2.5 text-xs">
+                    <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-900/70 px-3 py-2">
+                      <dt className="text-slate-400">Country / Sector</dt>
+                      <dd className="font-medium text-white text-right">
+                        {selectedEarthSite.countryOrSector}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-900/70 px-3 py-2">
+                      <dt className="text-slate-400">Coordinates</dt>
+                      <dd className="font-mono text-cyan-200 text-right">
+                        {formatLatLon(selectedEarthSite.latitude, selectedEarthSite.longitude)}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-900/70 px-3 py-2">
+                      <dt className="text-slate-400">Analogue Status</dt>
+                      <dd
+                        className={`font-mono font-semibold text-right ${
+                          selectedEarthSite.status === 'Established Reference'
+                            ? 'text-emerald-300'
+                            : 'text-amber-300'
+                        }`}
+                      >
+                        {selectedEarthSite.status}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="space-y-2 border-t border-slate-800 pt-3">
+                    <div className="flex items-center gap-1.5 font-display text-xs font-semibold text-white">
+                      <Database className="h-3.5 w-3.5 text-cyan-400" />
+                      <span>Available Dataset Information</span>
+                    </div>
+                    {selectedSiteDatasets.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {selectedSiteDatasets.map(({ dataset, matchReason }) => (
+                          <div
+                            key={dataset.id}
+                            className="rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 text-[11px]"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate font-mono text-slate-200">
+                                {dataset.filename}
+                              </span>
+                              <span
+                                className={`shrink-0 font-mono text-[10px] ${
+                                  dataset.processingStatus === 'Processed'
+                                    ? 'text-emerald-300'
+                                    : 'text-amber-300'
+                                }`}
+                              >
+                                {dataset.processingStatus === 'Processed'
+                                  ? 'Processed'
+                                  : 'Awaiting Upload'}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-[10px] text-slate-400">{matchReason}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-400">
+                        {selectedEarthSite.provenance} ({selectedEarthSite.dataCompletenessPct}%
+                        metadata completeness). No local DEM tile mounted yet.
+                      </p>
+                    )}
+                    <p className="text-[10px] text-slate-500">
+                      Source: {selectedEarthSite.sourceCitation}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onEnterApp('explorer', selectedEarthSite.id)}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-300"
+                  >
+                    <span>Inspect Full Morphometry</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-white/12 bg-[#080f23]/92 p-5 text-xs text-slate-400">
+                  Loading terrestrial analogue coordinates...
+                </div>
+              )}
+
+              {/* Quick-Select Directory of all 9 Earth Analogue Regions */}
+              <div className="rounded-xl border border-white/12 bg-[#080f23]/92 p-4 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-display text-xs font-semibold text-white">
+                    Indexed Earth Regions ({earthSites.length})
+                  </span>
+                  <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                      Reference
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-amber-400" />
+                      Candidate
+                    </span>
+                  </div>
+                </div>
+                <div className="grid max-h-[220px] grid-cols-1 gap-1.5 overflow-y-auto pr-1">
+                  {earthSites.map((site) => {
+                    const active = site.id === selectedEarthSite?.id;
+                    return (
+                      <button
+                        key={site.id}
+                        type="button"
+                        onClick={() => setSelectedEarthSiteId(site.id)}
+                        className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                          active
+                            ? 'border-cyan-400/70 bg-cyan-500/12 text-white'
+                            : 'border-slate-800/80 bg-slate-900/50 text-slate-300 hover:border-slate-700 hover:text-white'
+                        }`}
+                      >
+                        <span className="truncate font-medium">{site.name}</span>
+                        <span className="shrink-0 font-mono text-[10px] text-slate-400">
+                          {site.countryOrSector}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
