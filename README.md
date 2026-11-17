@@ -19,6 +19,25 @@
 
 ---
 
+## Cinematic field guide
+
+The root page opens a nine-chapter story on Earth, the Moon, and Mars. Chapter navigation leads to the paired terrain charts, analogue finder, interactive 3D viewer, data center, research copilot and report export. The original tools are available from the research chapter as an in-page workstation when the Express backend is running.
+
+Install and verify with Node.js 24.
+
+```sh
+npm ci
+npm run typecheck
+npm run build
+NODE_ENV=production npm start
+```
+
+Use `npm run dev` for local development. The Express service serves both the cinematic experience and the existing APIs. Persist the `data/` directory on the host to keep SQLite reports and uploaded datasets between restarts. Set `GEMINI_API_KEY` in the server environment to enable Gemini. The data-grounded local copilot is available without a key. The standalone static build serves terrain comparison and export without the persistent APIs.
+
+The original benchmark catalog and algorithms are retained. The new terrain meshes and derived terrain measurements come from real, independently sourced regional DEM windows centered on the fifteen original sites. `public/data/provenance.json` records source products, resolution and datum. The original weighted score and cluster results are displayed as research reference output. Synthetic calibration data remain explicitly identified.
+
+The story uses excerpts of the supplied Earth and lunar opening, the supplied Jezero flyover, and the supplied planetary sequence. The Earth laboratory uses [NASA's Grand Canyon photograph from the ISS](https://images.nasa.gov/details/iss074e0208838) because the uploads lacked a dedicated terrestrial landscape video. The clips are labeled as cinematic visualizations.
+
 ## ✨ The Vision
 
 > **Can we use Earth's extreme terrains to better understand environments on the Moon and Mars?**

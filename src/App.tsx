@@ -32,7 +32,10 @@ const DEFAULT_WEIGHTS: SimilarityWeights = {
 };
 
 export default function App() {
-  const [route, setRoute] = useState<AppRoute>('landing');
+  const [route, setRoute] = useState<AppRoute>(() => {
+    const view = new URLSearchParams(window.location.search).get('view');
+    return view === 'datacenter' || view === 'reports' || view === 'assistant' ? view : 'landing';
+  });
   const [missionVideoOpen, setMissionVideoOpen] = useState(false);
 
   const [overview, setOverview] = useState<OverviewStats | null>(null);
