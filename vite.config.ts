@@ -6,9 +6,20 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    define: {
+      'import.meta.env.VITE_ENABLE_LEGACY_API': JSON.stringify('true'),
+    },
+    build: {
+      rollupOptions: {
+        input: {
+          story: path.resolve(import.meta.dirname, 'index.html'),
+          legacy: path.resolve(import.meta.dirname, 'legacy.html'),
+        },
+      },
+    },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       },
     },
     server: {
